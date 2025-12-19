@@ -26,8 +26,7 @@ def load_data_optimized():
             for col in chunk.columns:
                 chunk[col] = chunk[col].astype('category')
             
-            # SPECIAL FIX FOR AGE (S4C6): Convert to Number for the Slider
-            # We look for 'S4C6' or 'Age' and force it to be numeric (handling errors)
+            # AGE FIX (S4C6)
             age_col = next((c for c in chunk.columns if c in ['S4C6', 'Age']), None)
             if age_col:
                 chunk[age_col] = pd.to_numeric(chunk[age_col], errors='coerce')
@@ -43,7 +42,7 @@ def load_data_optimized():
             codes = pd.read_csv("code.csv")
             rename_dict = {}
             for code, label in zip(codes.iloc[:, 0], codes.iloc[:, 1]):
-                # Keep original filter names + S4C6 (Age)
+                # Keep original filter names + S4C6
                 if code not in ['Province', 'District', 'Region', 'Tehsil', 'RSex', 'S4C5', 'S4C9', 'S4C6', 'Mouza', 'Locality']:
                     rename_dict[code] = f"{label} ({code})"
             df.rename(columns=rename_dict, inplace=True)
@@ -59,10 +58,10 @@ df = load_data_optimized()
 
 # --- 3. DASHBOARD LOGIC ---
 if df is not None:
-    # --- FILTERS (Directly on Sidebar) ---
+    # --- FILTERS ---
     st.sidebar.title("🔍 Filters")
     
-    # Helper to find columns safely
+    # Helper to find columns
     def get_col(candidates):
         for c in candidates:
             for col in df.columns:
@@ -76,52 +75,44 @@ if df is not None:
     tehsil_col = get_col(["Tehsil"])
     sex_col = get_col(["S4C5", "RSex", "Gender"])
     edu_col = get_col(["S4C9", "Education", "Highest class"])
-    age_col = get_col(["S4C6", "Age"]) # New Age Column
+    age_col = get_col(["S4C6", "Age"])
 
-    # 1. Province (Always Visible)
+    # 1. Province
     sel_prov = st.sidebar.multiselect("Province", df[prov_col].unique().tolist(), default=df[prov_col].unique().tolist())
     
-    # 2. Age Filter (Slider)
+    # 2. Age Slider
     if age_col:
-        # Calculate Min/Max for the slider
         min_age = int(df[age_col].min())
         max_age = int(df[age_col].max())
         sel_age = st.sidebar.slider("Age Range", min_age, max_age, (min_age, max_age))
     
-    # 3. District (Updates based on Province)
+    # 3. Dynamic Filters
     if sel_prov and dist_col:
         valid_districts = df[df[prov_col].isin(sel_prov)][dist_col].unique().tolist()
         sel_dist = st.sidebar.multiselect("District", valid_districts)
     else:
         sel_dist = []
 
-    # 4. Tehsil
     if sel_prov and tehsil_col:
         valid_tehsils = df[df[prov_col].isin(sel_prov)][tehsil_col].unique().tolist()
         sel_tehsil = st.sidebar.multiselect("Tehsil", valid_tehsils)
     else:
         sel_tehsil = []
 
-    # 5. Other Filters
     sel_reg = st.sidebar.multiselect("Region", df[reg_col].unique().tolist()) if reg_col else []
     sel_sex = st.sidebar.multiselect("Gender", df[sex_col].unique().tolist()) if sex_col else []
     sel_edu = st.sidebar.multiselect("Education", df[edu_col].unique().tolist()) if edu_col else []
 
-    # --- ZERO-COPY FILTERING LOGIC ---
-    # Start with all True
+    # --- FILTERING LOGIC ---
     mask = df[prov_col].isin(sel_prov)
     
-    # Add Age Logic
-    if age_col:
-        mask = mask & (df[age_col] >= sel_age[0]) & (df[age_col] <= sel_age[1])
-
+    if age_col: mask = mask & (df[age_col] >= sel_age[0]) & (df[age_col] <= sel_age[1])
     if sel_dist: mask = mask & df[dist_col].isin(sel_dist)
     if sel_tehsil: mask = mask & df[tehsil_col].isin(sel_tehsil)
     if sel_reg: mask = mask & df[reg_col].isin(sel_reg)
     if sel_sex: mask = mask & df[sex_col].isin(sel_sex)
     if sel_edu: mask = mask & df[edu_col].isin(sel_edu)
         
-    # Calculate Counts directly using the mask
     filtered_count = mask.sum()
 
     # --- KPI CARDS ---
@@ -132,36 +123,56 @@ if df is not None:
     
     st.markdown("---")
 
-    # --- QUESTION ANALYSIS ---
-    # Hide filter columns from the analysis dropdown
+    # --- ANALYSIS SECTION ---
     ignore = [prov_col, reg_col, sex_col, dist_col, tehsil_col, edu_col, age_col, "Mouza", "Locality", "PCode", "EBCode"]
     questions = [c for c in df.columns if c not in ignore]
     
     target_q = st.selectbox("Select Question to Analyze:", questions)
 
     if target_q:
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            # MEMORY TRICK: Only slice the ONE column we need
+        # Create Two Columns for Charts
+        chart_col1, chart_col2 = st.columns(2)
+
+        # --- CHART 1: OVERALL RESULTS (LEFT) ---
+        with chart_col1:
+            st.subheader("📊 Overall Results")
             counts = df.loc[mask, target_q].value_counts()
             
-            # Convert to neat dataframe for plotting
             chart_df = counts.reset_index()
             chart_df.columns = ["Answer", "Count"]
-            chart_df = chart_df[chart_df["Answer"].astype(str) != "#NULL!"] 
+            chart_df = chart_df[chart_df["Answer"].astype(str) != "#NULL!"]
             
             total = chart_df["Count"].sum()
             chart_df["Percentage"] = (chart_df["Count"] / total * 100).fillna(0)
             
-            # Plot
             fig = px.bar(chart_df, x="Answer", y="Count", color="Answer",
                          text=chart_df["Percentage"].apply(lambda x: f"{x:.1f}%"),
-                         title=f"Results: {target_q}")
+                         template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
+
+        # --- CHART 2: PROVINCIAL SPLIT (RIGHT) ---
+        with chart_col2:
+            st.subheader("🗺️ Provincial Breakdown")
+            # We group by Province AND the Answer
+            # Note: We filter out #NULL! answers for clarity
+            prov_data = df.loc[mask, [prov_col, target_q]]
+            prov_data = prov_data[prov_data[target_q].astype(str) != "#NULL!"]
             
-        with col2:
-            st.subheader("Data Table")
-            display_df = chart_df.copy()
-            display_df["Percentage"] = display_df["Percentage"].map("{:.1f}%".format)
-            st.dataframe(display_df, hide_index=True)
+            # Group and Count
+            prov_counts = prov_data.groupby([prov_col, target_q], observed=True).size().reset_index(name='Count')
+            
+            # Stacked Bar Chart
+            fig_prov = px.bar(prov_counts, x=prov_col, y="Count", color=target_q,
+                              title="Comparison by Province",
+                              barmode="group", # Side-by-side bars (Change to 'stack' if preferred)
+                              template="plotly_white")
+            st.plotly_chart(fig_prov, use_container_width=True)
+
+        # --- DATA TABLE (BOTTOM) ---
+        st.subheader("📋 Detailed Data Table")
+        display_df = chart_df.copy()
+        display_df["Percentage"] = display_df["Percentage"].map("{:.1f}%".format)
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+else:
+    st.info("Awaiting Data...")
