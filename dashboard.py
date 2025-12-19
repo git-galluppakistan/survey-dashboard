@@ -153,19 +153,29 @@ if df is not None:
         # --- CHART 2: PROVINCIAL SPLIT (RIGHT) ---
         with chart_col2:
             st.subheader("🗺️ Provincial Breakdown")
-            # We group by Province AND the Answer
-            # Note: We filter out #NULL! answers for clarity
+            # 1. Prepare Data
             prov_data = df.loc[mask, [prov_col, target_q]]
             prov_data = prov_data[prov_data[target_q].astype(str) != "#NULL!"]
             
-            # Group and Count
+            # 2. Group by Province AND Answer
             prov_counts = prov_data.groupby([prov_col, target_q], observed=True).size().reset_index(name='Count')
             
-            # Stacked Bar Chart
+            # 3. Calculate Percentage WITHIN each Province
+            # We calculate the total count for each province to use as the denominator
+            prov_totals = prov_counts.groupby(prov_col, observed=True)['Count'].transform('sum')
+            prov_counts['Percentage'] = (prov_counts['Count'] / prov_totals * 100).fillna(0)
+            
+            # 4. Format Text Label
+            prov_counts['Label'] = prov_counts['Percentage'].apply(lambda x: f"{x:.1f}%")
+            
+            # 5. Plot
             fig_prov = px.bar(prov_counts, x=prov_col, y="Count", color=target_q,
+                              text="Label", # Show percentage text
                               title="Comparison by Province",
-                              barmode="group", # Side-by-side bars (Change to 'stack' if preferred)
+                              barmode="group",
                               template="plotly_white")
+            
+            fig_prov.update_traces(textposition='outside') # Put % on top of bars
             st.plotly_chart(fig_prov, use_container_width=True)
 
         # --- DATA TABLE (BOTTOM) ---
