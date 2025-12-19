@@ -1,0 +1,156 @@
+﻿variable name,variable label
+PCode,PCode
+EBCode,EBCode
+Province,Province
+District,District
+Region,Region
+HHNo,HHNo
+HHSNo,HHSNo
+RSex,RSex
+RHHHRelation,RHHHRelation
+Tehsil,Tehsil
+Mouza,Mouza
+Locality,Locality
+FStatus,FStatus
+SNo,SNo
+S4C3,Relationship to head of household
+S4C4,Memeber present
+S4C5,Sex
+S4C6,Age (completed years)
+S4C7,Marital status
+S4C81,Can read
+S4C82,Can write
+S4C9,Highest class passed
+S4C10,Current Enrolment
+S4C11,"Has… ever completed/ currently receiving any technical, vocational and educational  training/courses such as auto or engine mechanics,"
+S4C12,Type of training
+S4C13,Duration of training (in weeks)
+S4C14,Provider of training /Courses
+S4C15,How long has (Name) been living in this district?
+S4C16,Previous district of residence (Name) before moving here.
+S4C17,Previous residence was located in…
+S4C18,Main reason for migration.
+S4C19,"Do/Does (Name’s) have difficulty seeing, even if wearing glasses?"
+S4C20,"Do/Does (Names’) have difficulty hearing, even if using a hearing aid?"
+S4C21,Do/Does (Names’) have difficulty walking or climbing steps?
+S4C22,Do/Does (Names’) have difficulty remembering or concentrating?
+S4C23,Do/Does (Names’) have difficulty (with self-care such as) washing all over or dressing?
+S4C24,"Using …… usual (customary/local) language, do/does (Names) have difficulty communicating, for example understanding or being understood?"
+S4C25,Do/Does (Names’) have difficulty (with self-care such as) washing all over or dressing?
+S4C26,
+S5C1,"Did…. do any work for pay, profit or family gain during last week, at least for one hour on any day?"
+S5C2,Did…help to work for family gain in a family business or family farm during last week?
+S5C3,"Even though (you/Name) did not work, last week did (you/he/she have a paid job or a business?"
+S5C4,Why did … not work last week?
+S5C5,In total will (you/Name) return to this same job/business.
+S5C6,Do/Does you Name’s continue to receive an income from (you/his/her job or business during this absence?
+S5C7,What was ……… employment status? (Read all the options to the respondent)
+S5C8," What was….. main occupation, e.g. what was the nature of work that ….did?"
+S5C9,"What was the nature of work done by the establishment such as shop, business, farm, service establishment (fixed or mobile), office/institution where. …worked?"
+S5C10,What kind of enterprise?
+S5C11,Does the  Enterprise keep written accounts?
+S5C12,"How many persons are engaged in the enterprise (including working proprietors, unpaid family workers, paid employees)?"
+S5C13,Are there any regular paid employees in the enterprise?
+S5C14, Where did…. carry out the work? (Read all the options to the respondent).
+S5C15,What was the location of work place?
+S5C16su,How many hours did… work each day during the last week at his/her main occupation? Sunday
+S5C16mo,How many hours did… work each day during the last week at his/her main occupation? Monday
+S5C16tu,How many hours did… work each day during the last week at his/her main occupation? Tuesday
+S5C16we,How many hours did… work each day during the last week at his/her main occupation? Wednessday
+S5C16th,How many hours did… work each day during the last week at his/her main occupation? Thursady
+S5C16fr,How many hours did… work each day during the last week at his/her main occupation? Friday
+S5C16sa,How many hours did… work each day during the last week at his/her main occupation? Saturday
+S5C161,How many hours did… work each day during the last week at his/her main occupation? Total Hours
+S5C162,How many hours did… work each day during the last week at his/her main occupation?  In case … A:     If had a job or enterprise on that day and did not work
+S5C163,How many hours did… work each day during the last week at his/her main occupation?  In case …  B:     If had no job or enterprise on that particular day but available for work
+S5C164,How many hours did… work each day during the last week at his/her main occupation?  In case C:     If had no job or enterprise on that particular day and not available for work
+S5C17,"In addition to the main occupation, did…also work in any subsidiary occupation last week?"
+S5C18,What was ……… employment status? (Read all the options to the respondent)
+S5C19, What was…... subsidiary occupation e.g. what was the nature of work that ….did?
+S5C20,"What was the nature of work done by the establishment such as shop, business, farm, service establishment (fixed or mobile), office/institution where… worked?"
+S5C21,What kind of enterprise?
+S5C22,Does the enterprise keep written accounts?
+S5C23,"How many persons are engaged in the enterprise (including working proprietors, unpaid family workers,, paid employees)"
+S5C24,Are there any regular paid employees in the enterprise?
+S5C25su,How many hours did…work each day during the last week at his/her subsidiary occupation (s)? Sunday
+S5C25mo,How many hours did…work each day during the last week at his/her subsidiary occupation (s)? Monday
+S5C25tu,How many hours did…work each day during the last week at his/her subsidiary occupation (s)? Tuesday
+S5C25we,How many hours did…work each day during the last week at his/her subsidiary occupation (s)? Wednessday
+S5C25th,How many hours did…work each day during the last week at his/her subsidiary occupation (s)? Thursday
+S5C25fr,How many hours did…work each day during the last week at his/her subsidiary occupation (s)? Friday
+S5C25sa,How many hours did…work each day during the last week at his/her subsidiary occupation (s)? Saturday
+S5C251,How many hours did…work each day during the last week at his/her subsidiary occupation (s)?Total Hours
+S5C26,In addition to main & subsidiary jobs did…..perform other job (s)?
+S5C27,What was the nature of main activity …… did one year ago?
+S6C1,"If total of Col. 5.16.1 and 5.25.1 is less than 35, then why did… work less than 35 hours during last week?"
+S6C2,"Would… want to work more hours than he/she worked in the last week, provided the hours or paid?"
+S6C3,Did…….. seek any additional work last week?
+S6C4,"If code ‘1’ in Col 6.3, then why did…….. seek an additional work?"
+S7C1,What was the status of job’s written contract/ agreement between the employee and the employer?
+S7C2,"At…..main work, what is the periodicity of payment?"
+S7C31,How much net money did …..earn from the main work last week? Net money earn in Cash in last week
+S7C32,How much net money did …..earn from the main work last week? Net money earn in in kind in last week
+S7C33,How much net money did …..earn from the main work last week? Net money earn in Total in last week
+S7C41,How much net money did…..earn from the main work last month? Net money earn in Cash in las month
+S7C42,How much net money did…..earn from the main work last month? Net money earn in kind in last month
+S7C43,How much net money did…..earn from the main work last month? Net money earn in total  in last month
+S7C51,"How much net money did…. receive last year in bonuses (i.e. amount in addition to his usual pay, remuneration etc)? Net money in bousnes in cash in last year"
+S7C52,"How much net money did…. receive last year in bonuses (i.e. amount in addition to his usual pay, remuneration etc)? Net money in bousnes in Kind in last year"
+S7C53,"How much net money did…. receive last year in bonuses (i.e. amount in addition to his usual pay, remuneration etc)? Net money in bousnes in Total in last year"
+S7C61,Whether (Name) is entitled to have? Old age pensions
+S7C62,Whether (Name) is entitled to have? Family support in case death of bread winner
+S7C63,Whether (Name) is entitled to have? Fee Re-imbursement/ educational stipend for children
+S7C64,Whether (Name) is entitled to have? Disability insurance/ social insurance
+S7C65,Whether (Name) is entitled to have? Medical facilities
+S7C66,Whether (Name) is entitled to have? Marriage Grant
+S7C67,Whether (Name) is entitled to have? Child Stipend
+S7C68,Whether (Name) is entitled to have?  Paid/ sick leave
+S7C69,Whether (Name) is entitled to have?  Other (specify…)
+S7C610,Whether (Name) is entitled to have? None
+S7C7,How much net money did… earn during last year from own business?
+S8C1,"In the past 12 months, did….. suffer any occupational injury/disease that caused to take time off work and/or consulted a doctor?"
+S8C1i,"In the past 12 months, did….. suffer any occupational injury/disease that caused to take time off work and/or consulted a doctor?"
+S8C21,What was the unsafe act that caused the accident/disease? 1st
+S8C22,What was the unsafe act that caused the accident/disease? 2nd
+S8C23,What was the unsafe act that caused the accident/disease? 3rd
+S8C31,Did…receive treatment for injury/ disease or have to take any time off work because of it?  1st
+S8C32,Did…receive treatment for injury/ disease or have to take any time off work because of it? 2nd
+S8C33,Did…receive treatment for injury/ disease or have to take any time off work because of it? 3rd
+S8C34,
+S8C41,What were the unsafe conditions causing the accident/disease? 1st
+S8C42,What were the unsafe conditions causing the accident/disease? 2nd
+S8C43,What were the unsafe conditions causing the accident/disease? 3rd
+S8C51,How soon was … able to go back to work/resume normal activities after the accident/disease? 1st
+S8C52,How soon was … able to go back to work/resume normal activities after the accident/disease? 2nd
+S8C53,How soon was … able to go back to work/resume normal activities after the accident/disease? 3rd
+S8C6,Did … receive any injury compensation in cash/ in kind from the employer?
+S9C1,Was (Name) seeking work during the last four week?
+S9C21,What steps did (Name) take during the last four weeks to seek work? Applied to prospective employer
+S9C22,"What steps did (Name) take during the last four weeks to seek work? Checked at work sites, farms, factories, markets, etc"
+S9C23,"What steps did (Name) take during the last four weeks to seek work? Applied for permit or license to set up own enterprise such as a shop, business, farm, or service establishment (fixed or mobile)"
+S9C24,"What steps did (Name) take during the last four weeks to seek work? Looked for land, building, machinery or equipment for setting up own enterprise such as shop, business, farm, service establishment (fixed or mobile)"
+S9C25,What steps did (Name) take during the last four weeks to seek work? Sought assistance from friends or relatives
+S9C26,What steps did (Name) take during the last four weeks to seek work? Placed or answered advertisements
+S9C27,What steps did (Name) take during the last four weeks to seek work? Registered with Government employment agency
+S9C28,What steps did (Name) take during the last four weeks to seek work? Registered with private employment agency
+S9C29,What steps did (Name) take during the last four weeks to seek work? Arranged for financial resources
+S9C210,What steps did (Name) take during the last four weeks to seek work? Applied for loan/credit
+S9C211,What steps did (Name) take during the last four weeks to seek work? Other (Specify)
+S9C212,What steps did (Name) take during the last four weeks to seek work? No specific step
+S9C213,What steps did (Name) take during the last four weeks to seek work? Unknown
+S9C3,How long has (Name) been seeking work?
+S9C4,"At present, does (Name) want to work for pay or start a business?"
+S9C5,What is the main reason why (Name) did not try to find a paid job or start a business in the last 4 weeks?
+S9C6,How soon would (Name) be available to start working?
+S9C7,What type of work would (Name) prefer to do?
+S9C8,Where would (Name) be willing to work?
+S9C9,Why is (Name) not available to start working within the next two weeks ?
+S9C10,"Has… ever worked in    -a job or business     -a farm or by fishing        -other household economic activities (collecting wood, milling/grinding food, etc.)"
+S9C11,Did….. work in the last 12 months?
+S9C12,"What was …..… main occupation, in other words, what was the nature of work… previously did?"
+S9C13,"What was the nature of work done by the enterprise such as shop, business, farm, service establishment (fixed or mobile), office/institution where…..…previously worked?"
+S9C14,What was……… employment status?
+S9C15,For how many years has….been doing this sort of work?
+S9C16,What was the main reason for leaving the last job/business?
+S9C17,Did (Name) receive any of the following benefits from any organization?
+Weights,Weights
