@@ -17,49 +17,57 @@ try:
 
     st.title("📊 Gallup Pakistan: National LFS Survey Dashboard")
 
-    # 2. LOAD & CLEAN DATA
-    @st.cache_data
-    def load_data():
-        try:
-            # Load files
-            df = pd.read_csv("data.zip", compression='zip', low_memory=False)
-            codes = pd.read_csv("code.csv")
-            
-            # --- STEP A: MAP VALUES (1->Male, 2->Female) ---
-            # We apply this to both RSex and S4C5 (Gender) just to be safe
-            gender_map = {
-                1: "Male", "1": "Male",
-                2: "Female", "2": "Female",
-                3: "Transgender", "3": "Transgender",
-                "#NULL!": "Unknown"
-            }
-            
-            # Apply to 'RSex' if it exists
-            if 'RSex' in df.columns:
-                df['RSex'] = df['RSex'].map(gender_map).fillna(df['RSex'])
-            # Apply to 'S4C5' if it exists
-            if 'S4C5' in df.columns:
-                df['S4C5'] = df['S4C5'].map(gender_map).fillna(df['S4C5'])
+# 2. LOAD & CLEAN DATA (MEMORY OPTIMIZED)
+@st.cache_data
+def load_data():
+    try:
+        # Load Data in Chunks to prevent crashing (Memory Saver)
+        chunks = []
+        # Read file in pieces of 50,000 rows
+        for chunk in pd.read_csv("data.zip", compression='zip', chunksize=50000, low_memory=True):
+            # Optimize: Convert text columns to 'category' (Saves 90% RAM)
+            for col in chunk.select_dtypes(include=['object']).columns:
+                chunk[col] = chunk[col].astype('category')
+            chunks.append(chunk)
+        
+        # Combine all pieces
+        df = pd.concat(chunks, axis=0)
+        
+        # Load Codebook
+        codes = pd.read_csv("code.csv")
+        
+        # --- STEP A: MAP VALUES (1->Male, 2->Female) ---
+        gender_map = {
+            "1": "Male", 1: "Male",
+            "2": "Female", 2: "Female",
+            "3": "Transgender", 3: "Transgender",
+            "#NULL!": "Unknown"
+        }
+        
+        # Apply to RSex (Convert to object temporarily if needed, then re-categorize)
+        if 'RSex' in df.columns:
+            df['RSex'] = df['RSex'].astype(str).map(gender_map).fillna(df['RSex']).astype('category')
+        if 'S4C5' in df.columns:
+            df['S4C5'] = df['S4C5'].astype(str).map(gender_map).fillna(df['S4C5']).astype('category')
 
-            # --- STEP B: PROTECT DEMOGRAPHICS FROM BEING RENAMED ---
-            # These will stay as simple names (Province, Region, etc.)
-            protected_cols = ['Province', 'District', 'Region', 'Tehsil', 'Mouza', 'Locality', 'RSex']
-            
-            # --- STEP C: RENAME OTHER COLUMNS ---
-            code_col = codes.columns[0]
-            label_col = codes.columns[1]
-            
-            rename_dict = {}
-            for code, label in zip(codes[code_col], codes[label_col]):
-                if code not in protected_cols:
-                    # Rename to "Question Text (Code)"
-                    rename_dict[code] = f"{label} ({code})"
-            
-            df.rename(columns=rename_dict, inplace=True)
-            return df
-        except Exception as e:
-            st.error(f"DATA LOADING ERROR: {e}")
-            return None
+        # --- STEP B: RENAME COLUMNS ---
+        protected_cols = ['Province', 'District', 'Region', 'Tehsil', 'Mouza', 'Locality', 'RSex']
+        
+        # Create rename dict
+        code_col = codes.columns[0]
+        label_col = codes.columns[1]
+        rename_dict = {}
+        
+        for code, label in zip(codes[code_col], codes[label_col]):
+            if code not in protected_cols:
+                rename_dict[code] = f"{label} ({code})"
+        
+        df.rename(columns=rename_dict, inplace=True)
+        return df
+
+    except Exception as e:
+        st.error(f"DATA LOADING ERROR: {e}")
+        return None
 
     df = load_data()
 
@@ -162,3 +170,4 @@ try:
 except Exception as e:
 
     st.error(f"CRITICAL ERROR: {e}")
+
