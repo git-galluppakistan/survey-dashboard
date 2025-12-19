@@ -7,7 +7,7 @@ import gc  # Garbage Collection to free memory
 # --- 1. SETUP & CONFIGURATION ---
 st.set_page_config(page_title="Gallup Pakistan Dashboard", layout="wide", page_icon="📊")
 
-# Hide Streamlit Branding for Professional Look
+# Hide Streamlit Branding
 st.markdown("""
     <style>
     .block-container {padding-top: 1rem; padding-bottom: 0rem;}
@@ -22,7 +22,7 @@ st.title("📊 Gallup Pakistan: National LFS Survey Dashboard")
 @st.cache_data
 def load_data():
     try:
-        # A. DETECT FILE
+        # A. DETECT FILE (Case Insensitive Check)
         if os.path.exists("data.zip"):
             file_name = "data.zip"
         elif os.path.exists("Data.zip"):
@@ -33,19 +33,20 @@ def load_data():
             
         # B. LOAD DATA IN CHUNKS
         chunks = []
-        # Load only necessary columns if possible, but for now we load all carefully
+        # Load file in 50k row pieces to save memory
         for chunk in pd.read_csv(file_name, compression='zip', chunksize=50000, low_memory=True):
-            # Optimize: Convert ALL objects to category
+            # Optimize: Convert text to category
             for col in chunk.select_dtypes(include=['object']).columns:
                 chunk[col] = chunk[col].astype('category')
-            # Downcast integers to save space
+            # Optimize: Downcast numbers
             for col in chunk.select_dtypes(include=['int64']).columns:
                 chunk[col] = pd.to_numeric(chunk[col], downcast='unsigned')
             chunks.append(chunk)
         
+        # Combine chunks
         df = pd.concat(chunks, axis=0)
-        del chunks # Delete chunks to free RAM immediately
-        gc.collect() # Force memory cleanup
+        del chunks # Free RAM
+        gc.collect() # Force cleanup
         
         # C. LOAD CODEBOOK
         if os.path.exists("code.csv"):
@@ -61,6 +62,7 @@ def load_data():
             "#NULL!": "Unknown"
         }
         
+        # Apply Mapping
         if 'RSex' in df.columns:
             df['RSex'] = df['RSex'].astype(str).map(gender_map).fillna(df['RSex']).astype('category')
         if 'S4C5' in df.columns:
@@ -107,21 +109,24 @@ if df is not None:
 
     # UI Options
     province = st.sidebar.multiselect("Province", df[prov_col].unique().tolist(), default=df[prov_col].unique().tolist())
+    
+    # Conditional filters
     region = st.sidebar.multiselect("Region", df[reg_col].unique().tolist()) if reg_col else []
     gender = st.sidebar.multiselect("Gender", df[sex_col].unique().tolist()) if sex_col else []
 
     # --- MEMORY EFFICIENT FILTERING ---
-    # Instead of creating a massive 'mask' of Trues/Falses (which takes RAM),
-    # We filter step-by-step and use .copy() to drop the link to the big dataframe
-    
+    # Step 1: Filter Province
     df_filtered = df[df[prov_col].isin(province)]
     
+    # Step 2: Filter Region (if selected)
     if region:
         df_filtered = df_filtered[df_filtered[reg_col].isin(region)]
+        
+    # Step 3: Filter Gender (if selected)
     if gender:
         df_filtered = df_filtered[df_filtered[sex_col].isin(gender)]
     
-    # Force Garbage Collection after filtering
+    # Clean up memory
     gc.collect()
 
     # --- 4. KPI CARDS ---
@@ -146,7 +151,7 @@ if df is not None:
         col1, col2 = st.columns([2, 1])
 
         with col1:
-            # GroupBy is faster and uses less RAM than value_counts on full frame
+            # GroupBy is faster and uses less RAM
             chart_df = df_filtered[selected_q].value_counts(dropna=True).reset_index()
             chart_df.columns = ["Answer", "Count"]
             
@@ -154,4 +159,20 @@ if df is not None:
             chart_df = chart_df[chart_df["Answer"].astype(str) != "#NULL!"]
             
             total = chart_df["Count"].sum()
-            chart_df["Percentage"] = (chart_df
+            # THIS WAS THE LINE CAUSING THE ERROR:
+            chart_df["Percentage"] = (chart_df["Count"] / total * 100) if total > 0 else 0
+            
+            fig = px.bar(chart_df, x="Answer", y="Count", color="Answer", 
+                         text=chart_df["Percentage"].apply(lambda x: f"{x:.1f}%"),
+                         title=f"Results for: {selected_q}", template="plotly_white")
+            fig.update_traces(textposition='outside')
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            st.subheader("Stats Table")
+            display_df = chart_df.copy()
+            display_df["Percentage"] = display_df["Percentage"].map("{:.1f}%".format)
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+else:
+    st.info("Awaiting Data...")
