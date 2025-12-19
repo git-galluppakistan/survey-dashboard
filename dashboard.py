@@ -161,21 +161,24 @@ if df is not None:
             prov_counts = prov_data.groupby([prov_col, target_q], observed=True).size().reset_index(name='Count')
             
             # 3. Calculate Percentage WITHIN each Province
-            # We calculate the total count for each province to use as the denominator
             prov_totals = prov_counts.groupby(prov_col, observed=True)['Count'].transform('sum')
             prov_counts['Percentage'] = (prov_counts['Count'] / prov_totals * 100).fillna(0)
             
             # 4. Format Text Label
             prov_counts['Label'] = prov_counts['Percentage'].apply(lambda x: f"{x:.1f}%")
             
-            # 5. Plot
-            fig_prov = px.bar(prov_counts, x=prov_col, y="Count", color=target_q,
+            # 5. Plot (Y-AXIS CHANGED TO PERCENTAGE)
+            fig_prov = px.bar(prov_counts, x=prov_col, y="Percentage", color=target_q,
                               text="Label", # Show percentage text
-                              title="Comparison by Province",
+                              title="Comparison by Province (%)",
                               barmode="group",
-                              template="plotly_white")
+                              template="plotly_white",
+                              hover_data={"Count": True, "Percentage": ":.1f"}) # Show count on hover only
             
-            fig_prov.update_traces(textposition='outside') # Put % on top of bars
+            # 6. Force Y-Axis to 0-100%
+            fig_prov.update_yaxes(range=[0, 105], title="Percentage (%)")
+            fig_prov.update_traces(textposition='outside')
+            
             st.plotly_chart(fig_prov, use_container_width=True)
 
         # --- DATA TABLE (BOTTOM) ---
