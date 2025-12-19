@@ -133,7 +133,7 @@ if df is not None:
         # Create Two Columns for Charts
         chart_col1, chart_col2 = st.columns(2)
 
-        # --- CHART 1: OVERALL RESULTS (LEFT) ---
+        # --- LEFT: OVERALL RESULTS ---
         with chart_col1:
             st.subheader("📊 Overall Results")
             counts = df.loc[mask, target_q].value_counts()
@@ -150,7 +150,7 @@ if df is not None:
                          template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
-        # --- CHART 2: PROVINCIAL SPLIT (RIGHT) ---
+        # --- RIGHT: PROVINCE + DISTRICT ---
         with chart_col2:
             st.subheader("🗺️ Provincial Breakdown")
             # 1. Prepare Data
@@ -164,25 +164,47 @@ if df is not None:
             prov_totals = prov_counts.groupby(prov_col, observed=True)['Count'].transform('sum')
             prov_counts['Percentage'] = (prov_counts['Count'] / prov_totals * 100).fillna(0)
             
-            # 4. Format Text Label
+            # 4. Format Label
             prov_counts['Label'] = prov_counts['Percentage'].apply(lambda x: f"{x:.1f}%")
             
-            # 5. Plot (Y-AXIS CHANGED TO PERCENTAGE)
+            # 5. Plot (Percentage Y-Axis)
             fig_prov = px.bar(prov_counts, x=prov_col, y="Percentage", color=target_q,
-                              text="Label", # Show percentage text
+                              text="Label", 
                               title="Comparison by Province (%)",
                               barmode="group",
                               template="plotly_white",
-                              hover_data={"Count": True, "Percentage": ":.1f"}) # Show count on hover only
+                              hover_data={"Count": True, "Percentage": ":.1f"})
             
-            # 6. Force Y-Axis to 0-100%
             fig_prov.update_yaxes(range=[0, 105], title="Percentage (%)")
             fig_prov.update_traces(textposition='outside')
-            
             st.plotly_chart(fig_prov, use_container_width=True)
+            
+            # --- NEW: DISTRICT BREAKDOWN TABLE ---
+            st.markdown("### 🏘️ District Rankings")
+            st.caption("Table shows Percentages (%) sorted by the most common answer.")
+            
+            if dist_col:
+                # 1. Get Data for District Pivot
+                dist_data = df.loc[mask, [dist_col, target_q]]
+                dist_data = dist_data[dist_data[target_q].astype(str) != "#NULL!"]
+                
+                # 2. Create Pivot Table (normalize='index' converts counts to %)
+                # Rows = Districts, Columns = Answers, Values = %
+                dist_pivot = pd.crosstab(dist_data[dist_col], dist_data[target_q], normalize='index') * 100
+                
+                if not dist_pivot.empty:
+                    # 3. Sort by the most popular answer column (Descending)
+                    top_answer = dist_pivot.mean().idxmax()
+                    dist_pivot = dist_pivot.sort_values(by=top_answer, ascending=False)
+                    
+                    # 4. Format as String with %
+                    dist_display = dist_pivot.apply(lambda x: x.map("{:.1f}%".format))
+                    
+                    # 5. Show Table
+                    st.dataframe(dist_display, use_container_width=True, height=400)
 
         # --- DATA TABLE (BOTTOM) ---
-        st.subheader("📋 Detailed Data Table")
+        st.subheader("📋 Detailed Overall Data")
         display_df = chart_df.copy()
         display_df["Percentage"] = display_df["Percentage"].map("{:.1f}%".format)
         st.dataframe(display_df, use_container_width=True, hide_index=True)
