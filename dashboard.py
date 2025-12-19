@@ -22,7 +22,7 @@ try:
     def load_data():
         try:
             # Load files
-            df = pd.read_csv("Data.zip", compression='zip', low_memory=False)
+            df = pd.read_csv("data.zip", compression='zip', low_memory=False)
             codes = pd.read_csv("code.csv")
             
             # --- STEP A: MAP VALUES (1->Male, 2->Female) ---
@@ -160,4 +160,5 @@ try:
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 except Exception as e:
+
     st.error(f"CRITICAL ERROR: {e}")
