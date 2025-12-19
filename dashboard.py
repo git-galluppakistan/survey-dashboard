@@ -25,6 +25,13 @@ def load_data_optimized():
             # Force everything to category
             for col in chunk.columns:
                 chunk[col] = chunk[col].astype('category')
+            
+            # SPECIAL FIX FOR AGE (S4C6): Convert to Number for the Slider
+            # We look for 'S4C6' or 'Age' and force it to be numeric (handling errors)
+            age_col = next((c for c in chunk.columns if c in ['S4C6', 'Age']), None)
+            if age_col:
+                chunk[age_col] = pd.to_numeric(chunk[age_col], errors='coerce')
+
             chunks.append(chunk)
         
         df = pd.concat(chunks, axis=0)
@@ -36,8 +43,8 @@ def load_data_optimized():
             codes = pd.read_csv("code.csv")
             rename_dict = {}
             for code, label in zip(codes.iloc[:, 0], codes.iloc[:, 1]):
-                # Keep original filter names so logic doesn't break
-                if code not in ['Province', 'District', 'Region', 'Tehsil', 'RSex', 'S4C5', 'S4C9', 'Mouza', 'Locality']:
+                # Keep original filter names + S4C6 (Age)
+                if code not in ['Province', 'District', 'Region', 'Tehsil', 'RSex', 'S4C5', 'S4C9', 'S4C6', 'Mouza', 'Locality']:
                     rename_dict[code] = f"{label} ({code})"
             df.rename(columns=rename_dict, inplace=True)
 
@@ -69,26 +76,33 @@ if df is not None:
     tehsil_col = get_col(["Tehsil"])
     sex_col = get_col(["S4C5", "RSex", "Gender"])
     edu_col = get_col(["S4C9", "Education", "Highest class"])
+    age_col = get_col(["S4C6", "Age"]) # New Age Column
 
     # 1. Province (Always Visible)
     sel_prov = st.sidebar.multiselect("Province", df[prov_col].unique().tolist(), default=df[prov_col].unique().tolist())
     
-    # 2. District (Updates based on Province to save RAM)
+    # 2. Age Filter (Slider)
+    if age_col:
+        # Calculate Min/Max for the slider
+        min_age = int(df[age_col].min())
+        max_age = int(df[age_col].max())
+        sel_age = st.sidebar.slider("Age Range", min_age, max_age, (min_age, max_age))
+    
+    # 3. District (Updates based on Province)
     if sel_prov and dist_col:
-        # Get only districts in selected provinces
         valid_districts = df[df[prov_col].isin(sel_prov)][dist_col].unique().tolist()
         sel_dist = st.sidebar.multiselect("District", valid_districts)
     else:
         sel_dist = []
 
-    # 3. Tehsil
+    # 4. Tehsil
     if sel_prov and tehsil_col:
         valid_tehsils = df[df[prov_col].isin(sel_prov)][tehsil_col].unique().tolist()
         sel_tehsil = st.sidebar.multiselect("Tehsil", valid_tehsils)
     else:
         sel_tehsil = []
 
-    # 4. Other Filters
+    # 5. Other Filters
     sel_reg = st.sidebar.multiselect("Region", df[reg_col].unique().tolist()) if reg_col else []
     sel_sex = st.sidebar.multiselect("Gender", df[sex_col].unique().tolist()) if sex_col else []
     sel_edu = st.sidebar.multiselect("Education", df[edu_col].unique().tolist()) if edu_col else []
@@ -97,6 +111,10 @@ if df is not None:
     # Start with all True
     mask = df[prov_col].isin(sel_prov)
     
+    # Add Age Logic
+    if age_col:
+        mask = mask & (df[age_col] >= sel_age[0]) & (df[age_col] <= sel_age[1])
+
     if sel_dist: mask = mask & df[dist_col].isin(sel_dist)
     if sel_tehsil: mask = mask & df[tehsil_col].isin(sel_tehsil)
     if sel_reg: mask = mask & df[reg_col].isin(sel_reg)
@@ -116,7 +134,7 @@ if df is not None:
 
     # --- QUESTION ANALYSIS ---
     # Hide filter columns from the analysis dropdown
-    ignore = [prov_col, reg_col, sex_col, dist_col, tehsil_col, edu_col, "Mouza", "Locality", "PCode", "EBCode"]
+    ignore = [prov_col, reg_col, sex_col, dist_col, tehsil_col, edu_col, age_col, "Mouza", "Locality", "PCode", "EBCode"]
     questions = [c for c in df.columns if c not in ignore]
     
     target_q = st.selectbox("Select Question to Analyze:", questions)
