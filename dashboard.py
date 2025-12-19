@@ -130,10 +130,10 @@ if df is not None:
     target_q = st.selectbox("Select Question to Analyze:", questions)
 
     if target_q:
-        # Create Two Columns for Charts
+        # --- ROW 1: CHARTS ---
         chart_col1, chart_col2 = st.columns(2)
 
-        # --- LEFT: OVERALL RESULTS ---
+        # LEFT CHART: OVERALL RESULTS
         with chart_col1:
             st.subheader("📊 Overall Results")
             counts = df.loc[mask, target_q].value_counts()
@@ -150,24 +150,17 @@ if df is not None:
                          template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
-        # --- RIGHT: PROVINCE + DISTRICT ---
+        # RIGHT CHART: PROVINCIAL SPLIT
         with chart_col2:
             st.subheader("🗺️ Provincial Breakdown")
-            # 1. Prepare Data
             prov_data = df.loc[mask, [prov_col, target_q]]
             prov_data = prov_data[prov_data[target_q].astype(str) != "#NULL!"]
             
-            # 2. Group by Province AND Answer
             prov_counts = prov_data.groupby([prov_col, target_q], observed=True).size().reset_index(name='Count')
-            
-            # 3. Calculate Percentage WITHIN each Province
             prov_totals = prov_counts.groupby(prov_col, observed=True)['Count'].transform('sum')
             prov_counts['Percentage'] = (prov_counts['Count'] / prov_totals * 100).fillna(0)
-            
-            # 4. Format Label
             prov_counts['Label'] = prov_counts['Percentage'].apply(lambda x: f"{x:.1f}%")
             
-            # 5. Plot (Percentage Y-Axis)
             fig_prov = px.bar(prov_counts, x=prov_col, y="Percentage", color=target_q,
                               text="Label", 
                               title="Comparison by Province (%)",
@@ -178,36 +171,35 @@ if df is not None:
             fig_prov.update_yaxes(range=[0, 105], title="Percentage (%)")
             fig_prov.update_traces(textposition='outside')
             st.plotly_chart(fig_prov, use_container_width=True)
-            
-            # --- NEW: DISTRICT BREAKDOWN TABLE ---
-            st.markdown("### 🏘️ District Rankings")
-            st.caption("Table shows Percentages (%) sorted by the most common answer.")
-            
+
+        # --- ROW 2: DATA TABLES ---
+        table_col1, table_col2 = st.columns(2)
+
+        # LEFT TABLE: OVERALL DATA
+        with table_col1:
+            st.markdown("### 📋 Overall Data Table")
+            display_df = chart_df.copy()
+            display_df["Percentage"] = display_df["Percentage"].map("{:.1f}%".format)
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+        # RIGHT TABLE: DISTRICT RANKINGS
+        with table_col2:
+            st.markdown("### 🏘️ District Rankings (Top %)")
             if dist_col:
-                # 1. Get Data for District Pivot
                 dist_data = df.loc[mask, [dist_col, target_q]]
                 dist_data = dist_data[dist_data[target_q].astype(str) != "#NULL!"]
                 
-                # 2. Create Pivot Table (normalize='index' converts counts to %)
-                # Rows = Districts, Columns = Answers, Values = %
+                # Pivot: Rows=District, Cols=Answer, Values=%
                 dist_pivot = pd.crosstab(dist_data[dist_col], dist_data[target_q], normalize='index') * 100
                 
                 if not dist_pivot.empty:
-                    # 3. Sort by the most popular answer column (Descending)
+                    # Sort by the most common answer overall
                     top_answer = dist_pivot.mean().idxmax()
                     dist_pivot = dist_pivot.sort_values(by=top_answer, ascending=False)
                     
-                    # 4. Format as String with %
+                    # Format
                     dist_display = dist_pivot.apply(lambda x: x.map("{:.1f}%".format))
-                    
-                    # 5. Show Table
-                    st.dataframe(dist_display, use_container_width=True, height=400)
-
-        # --- DATA TABLE (BOTTOM) ---
-        st.subheader("📋 Detailed Overall Data")
-        display_df = chart_df.copy()
-        display_df["Percentage"] = display_df["Percentage"].map("{:.1f}%".format)
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+                    st.dataframe(dist_display, use_container_width=True)
 
 else:
     st.info("Awaiting Data...")
