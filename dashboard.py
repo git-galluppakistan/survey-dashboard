@@ -10,7 +10,6 @@ st.markdown("""<style>.block-container {padding-top: 1rem;}</style>""", unsafe_a
 st.title("📊 Gallup Pakistan: National LFS Survey")
 
 # --- 2. ZERO-COPY DATA LOADER ---
-# We use cache_resource because it shares the memory pointer instead of copying data
 @st.cache_resource
 def load_data_optimized():
     try:
@@ -23,7 +22,7 @@ def load_data_optimized():
         # B. Chunk Load & Compress
         chunks = []
         for chunk in pd.read_csv(file_name, compression='zip', chunksize=50000, low_memory=True):
-            # Force everything to category (The biggest RAM saver)
+            # Force everything to category
             for col in chunk.columns:
                 chunk[col] = chunk[col].astype('category')
             chunks.append(chunk)
@@ -35,11 +34,10 @@ def load_data_optimized():
         # C. Load Codebook
         if os.path.exists("code.csv"):
             codes = pd.read_csv("code.csv")
-            # Create rename dictionary
             rename_dict = {}
             for code, label in zip(codes.iloc[:, 0], codes.iloc[:, 1]):
-                # Keep original filter names
-                if code not in ['Province', 'District', 'Region', 'Tehsil', 'RSex', 'S4C5']:
+                # Keep original filter names so logic doesn't break
+                if code not in ['Province', 'District', 'Region', 'Tehsil', 'RSex', 'S4C5', 'S4C9', 'Mouza', 'Locality']:
                     rename_dict[code] = f"{label} ({code})"
             df.rename(columns=rename_dict, inplace=True)
 
@@ -67,23 +65,43 @@ if df is not None:
     # Get Columns
     prov_col = get_col(["Province"])
     reg_col = get_col(["Region"])
+    dist_col = get_col(["District"])
+    tehsil_col = get_col(["Tehsil"])
     sex_col = get_col(["S4C5", "RSex", "Gender"])
+    edu_col = get_col(["S4C9", "Education", "Highest class"])
 
-    # Create Filter Widgets
-    # We use .unique().tolist() to avoid keeping large arrays in memory
+    # 1. Province (Always Visible)
     sel_prov = st.sidebar.multiselect("Province", df[prov_col].unique().tolist(), default=df[prov_col].unique().tolist())
+    
+    # 2. District (Updates based on Province to save RAM)
+    if sel_prov and dist_col:
+        # Get only districts in selected provinces
+        valid_districts = df[df[prov_col].isin(sel_prov)][dist_col].unique().tolist()
+        sel_dist = st.sidebar.multiselect("District", valid_districts)
+    else:
+        sel_dist = []
+
+    # 3. Tehsil
+    if sel_prov and tehsil_col:
+        valid_tehsils = df[df[prov_col].isin(sel_prov)][tehsil_col].unique().tolist()
+        sel_tehsil = st.sidebar.multiselect("Tehsil", valid_tehsils)
+    else:
+        sel_tehsil = []
+
+    # 4. Other Filters
     sel_reg = st.sidebar.multiselect("Region", df[reg_col].unique().tolist()) if reg_col else []
     sel_sex = st.sidebar.multiselect("Gender", df[sex_col].unique().tolist()) if sex_col else []
+    sel_edu = st.sidebar.multiselect("Education", df[edu_col].unique().tolist()) if edu_col else []
 
-    # --- ZERO-COPY FILTERING ---
-    # Instead of making a new dataframe, we create a simple True/False list (very small)
+    # --- ZERO-COPY FILTERING LOGIC ---
     # Start with all True
     mask = df[prov_col].isin(sel_prov)
     
-    if sel_reg:
-        mask = mask & df[reg_col].isin(sel_reg)
-    if sel_sex:
-        mask = mask & df[sex_col].isin(sel_sex)
+    if sel_dist: mask = mask & df[dist_col].isin(sel_dist)
+    if sel_tehsil: mask = mask & df[tehsil_col].isin(sel_tehsil)
+    if sel_reg: mask = mask & df[reg_col].isin(sel_reg)
+    if sel_sex: mask = mask & df[sex_col].isin(sel_sex)
+    if sel_edu: mask = mask & df[edu_col].isin(sel_edu)
         
     # Calculate Counts directly using the mask
     filtered_count = mask.sum()
@@ -97,7 +115,8 @@ if df is not None:
     st.markdown("---")
 
     # --- QUESTION ANALYSIS ---
-    ignore = [prov_col, reg_col, sex_col, "District", "Tehsil", "Mouza", "Locality"]
+    # Hide filter columns from the analysis dropdown
+    ignore = [prov_col, reg_col, sex_col, dist_col, tehsil_col, edu_col, "Mouza", "Locality", "PCode", "EBCode"]
     questions = [c for c in df.columns if c not in ignore]
     
     target_q = st.selectbox("Select Question to Analyze:", questions)
@@ -106,14 +125,13 @@ if df is not None:
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            # MEMORY TRICK: Only slice the ONE column we need, then count
-            # This avoids copying the whole 50-column dataframe
+            # MEMORY TRICK: Only slice the ONE column we need
             counts = df.loc[mask, target_q].value_counts()
             
             # Convert to neat dataframe for plotting
             chart_df = counts.reset_index()
             chart_df.columns = ["Answer", "Count"]
-            chart_df = chart_df[chart_df["Answer"].astype(str) != "#NULL!"] # Hide NULLs
+            chart_df = chart_df[chart_df["Answer"].astype(str) != "#NULL!"] 
             
             total = chart_df["Count"].sum()
             chart_df["Percentage"] = (chart_df["Count"] / total * 100).fillna(0)
