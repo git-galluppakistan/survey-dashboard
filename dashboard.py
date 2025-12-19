@@ -42,7 +42,6 @@ def load_data_optimized():
             codes = pd.read_csv("code.csv")
             rename_dict = {}
             for code, label in zip(codes.iloc[:, 0], codes.iloc[:, 1]):
-                # Keep original filter names + S4C6
                 if code not in ['Province', 'District', 'Region', 'Tehsil', 'RSex', 'S4C5', 'S4C9', 'S4C6', 'Mouza', 'Locality']:
                     rename_dict[code] = f"{label} ({code})"
             df.rename(columns=rename_dict, inplace=True)
@@ -130,10 +129,12 @@ if df is not None:
     target_q = st.selectbox("Select Question to Analyze:", questions)
 
     if target_q:
-        # --- ROW 1: CHARTS ---
+        # ==========================================================
+        # ROW 1: OVERALL & PROVINCE
+        # ==========================================================
         chart_col1, chart_col2 = st.columns(2)
 
-        # LEFT CHART: OVERALL RESULTS
+        # 1. OVERALL RESULTS
         with chart_col1:
             st.subheader("📊 Overall Results")
             counts = df.loc[mask, target_q].value_counts()
@@ -150,7 +151,7 @@ if df is not None:
                          template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
-        # RIGHT CHART: PROVINCIAL SPLIT
+        # 2. PROVINCE BREAKDOWN
         with chart_col2:
             st.subheader("🗺️ Provincial Breakdown")
             prov_data = df.loc[mask, [prov_col, target_q]]
@@ -162,17 +163,77 @@ if df is not None:
             prov_counts['Label'] = prov_counts['Percentage'].apply(lambda x: f"{x:.1f}%")
             
             fig_prov = px.bar(prov_counts, x=prov_col, y="Percentage", color=target_q,
-                              text="Label", 
-                              title="Comparison by Province (%)",
-                              barmode="group",
-                              template="plotly_white",
-                              hover_data={"Count": True, "Percentage": ":.1f"})
-            
-            fig_prov.update_yaxes(range=[0, 105], title="Percentage (%)")
+                              text="Label", barmode="group", template="plotly_white")
+            fig_prov.update_yaxes(range=[0, 105])
             fig_prov.update_traces(textposition='outside')
             st.plotly_chart(fig_prov, use_container_width=True)
 
-        # --- ROW 2: DATA TABLES ---
+        # ==========================================================
+        # ROW 2: GENDER & REGION
+        # ==========================================================
+        chart_col3, chart_col4 = st.columns(2)
+
+        # 3. GENDER BREAKDOWN
+        with chart_col3:
+            if sex_col:
+                st.subheader("🚻 Gender Breakdown")
+                sex_data = df.loc[mask, [sex_col, target_q]]
+                sex_data = sex_data[sex_data[target_q].astype(str) != "#NULL!"]
+                
+                sex_counts = sex_data.groupby([sex_col, target_q], observed=True).size().reset_index(name='Count')
+                sex_totals = sex_counts.groupby(sex_col, observed=True)['Count'].transform('sum')
+                sex_counts['Percentage'] = (sex_counts['Count'] / sex_totals * 100).fillna(0)
+                sex_counts['Label'] = sex_counts['Percentage'].apply(lambda x: f"{x:.1f}%")
+                
+                fig_sex = px.bar(sex_counts, x=sex_col, y="Percentage", color=target_q,
+                                 text="Label", barmode="group", template="plotly_white")
+                fig_sex.update_yaxes(range=[0, 105])
+                fig_sex.update_traces(textposition='outside')
+                st.plotly_chart(fig_sex, use_container_width=True)
+
+        # 4. REGION BREAKDOWN
+        with chart_col4:
+            if reg_col:
+                st.subheader("🏙️ Region Breakdown")
+                reg_data = df.loc[mask, [reg_col, target_q]]
+                reg_data = reg_data[reg_data[target_q].astype(str) != "#NULL!"]
+                
+                reg_counts = reg_data.groupby([reg_col, target_q], observed=True).size().reset_index(name='Count')
+                reg_totals = reg_counts.groupby(reg_col, observed=True)['Count'].transform('sum')
+                reg_counts['Percentage'] = (reg_counts['Count'] / reg_totals * 100).fillna(0)
+                reg_counts['Label'] = reg_counts['Percentage'].apply(lambda x: f"{x:.1f}%")
+                
+                fig_reg = px.bar(reg_counts, x=reg_col, y="Percentage", color=target_q,
+                                 text="Label", barmode="group", template="plotly_white")
+                fig_reg.update_yaxes(range=[0, 105])
+                fig_reg.update_traces(textposition='outside')
+                st.plotly_chart(fig_reg, use_container_width=True)
+
+        # ==========================================================
+        # ROW 3: AGE TRENDS
+        # ==========================================================
+        if age_col:
+            st.subheader("📈 Age Trends")
+            age_data = df.loc[mask, [age_col, target_q]].copy()
+            age_data = age_data[age_data[target_q].astype(str) != "#NULL!"]
+            
+            # Create Age Bins for cleaner chart
+            bins = [0, 18, 25, 35, 45, 55, 65, 100]
+            labels = ['<18', '18-24', '25-34', '35-44', '45-54', '55-64', '65+']
+            age_data['Age Group'] = pd.cut(age_data[age_col], bins=bins, labels=labels)
+            
+            age_counts = age_data.groupby(['Age Group', target_q], observed=True).size().reset_index(name='Count')
+            age_totals = age_counts.groupby('Age Group', observed=True)['Count'].transform('sum')
+            age_counts['Percentage'] = (age_counts['Count'] / age_totals * 100).fillna(0)
+            
+            fig_age = px.line(age_counts, x="Age Group", y="Percentage", color=target_q, 
+                              markers=True, template="plotly_white")
+            fig_age.update_yaxes(range=[0, 105])
+            st.plotly_chart(fig_age, use_container_width=True)
+
+        # ==========================================================
+        # ROW 4: DATA TABLES
+        # ==========================================================
         table_col1, table_col2 = st.columns(2)
 
         # LEFT TABLE: OVERALL DATA
@@ -189,15 +250,12 @@ if df is not None:
                 dist_data = df.loc[mask, [dist_col, target_q]]
                 dist_data = dist_data[dist_data[target_q].astype(str) != "#NULL!"]
                 
-                # Pivot: Rows=District, Cols=Answer, Values=%
+                # Pivot
                 dist_pivot = pd.crosstab(dist_data[dist_col], dist_data[target_q], normalize='index') * 100
                 
                 if not dist_pivot.empty:
-                    # Sort by the most common answer overall
                     top_answer = dist_pivot.mean().idxmax()
                     dist_pivot = dist_pivot.sort_values(by=top_answer, ascending=False)
-                    
-                    # Format
                     dist_display = dist_pivot.apply(lambda x: x.map("{:.1f}%".format))
                     st.dataframe(dist_display, use_container_width=True)
 
