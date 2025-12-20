@@ -162,9 +162,6 @@ if df is not None:
         with col3:
             st.markdown("**🚻 By Gender**")
             if sex_col:
-                sex_grp = main_data.groupby([sex_col, target_q], observed=True).size().reset_index(name='Count')
-                # For donut, we just show the split of the Top Answer usually, or split by Gender
-                # Let's show Gender split for the whole filtered selection
                 gender_counts = main_data[sex_col].value_counts().reset_index()
                 gender_counts.columns = ["Gender", "Count"]
                 
@@ -222,15 +219,26 @@ if df is not None:
         
         with t1:
             st.subheader("📋 Overall Data")
+            # Display formatted percentage in table
+            counts["%"] = counts["%"].map("{:.1f}%".format)
             st.dataframe(counts, use_container_width=True, hide_index=True)
             
         with t2:
             st.subheader("🏘️ District Rankings (Top %)")
             if dist_col:
+                # 1. Create Pivot
                 dist_pivot = pd.crosstab(main_data[dist_col], main_data[target_q], normalize='index') * 100
                 top_ans = dist_pivot.mean().idxmax()
-                dist_pivot = dist_pivot.sort_values(by=top_ans, ascending=False).head(50) # Show top 50 to save memory
-                st.dataframe(dist_pivot.style.format("{:.1f}%"), use_container_width=True)
+                
+                # 2. Sort and Take Top 50
+                dist_pivot = dist_pivot.sort_values(by=top_ans, ascending=False).head(50)
+                
+                # 3. CONVERT TO STRING TO PREVENT CRASH
+                # We use applymap to turn 45.2 -> "45.2%" manually
+                dist_display = dist_pivot.apply(lambda x: x.map("{:.1f}%".format))
+                
+                # 4. Show Safe Table
+                st.dataframe(dist_display, use_container_width=True)
 
 else:
     st.info("Awaiting Data...")
