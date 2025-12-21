@@ -86,7 +86,7 @@ if df is not None:
     edu_col = get_col(["S4C9", "Education", "Highest class"])
     age_col = get_col(["S4C6", "Age"])
 
-    # 1. Province (Always Visible)
+    # 1. Province
     prov_list = df[prov_col].unique().tolist() if prov_col else []
     sel_prov = st.sidebar.multiselect("Province", prov_list, default=prov_list)
     
@@ -95,22 +95,20 @@ if df is not None:
         min_age, max_age = int(df[age_col].min()), int(df[age_col].max())
         sel_age = st.sidebar.slider("Age Range", min_age, max_age, (min_age, max_age))
     
-    # 3. District (Dependent on Province)
+    # 3. District
     valid_districts = df[df[prov_col].isin(sel_prov)][dist_col].unique().tolist() if (sel_prov and dist_col) else []
     sel_dist = st.sidebar.multiselect("District", valid_districts)
 
-    # 4. Tehsil (Dependent on District) - NEW
+    # 4. Tehsil
     if sel_dist and tehsil_col:
         valid_tehsils = df[df[dist_col].isin(sel_dist)][tehsil_col].unique().tolist()
     else:
-        valid_tehsils = [] # Hide if no district selected to save memory
+        valid_tehsils = []
     sel_tehsil = st.sidebar.multiselect("Tehsil", valid_tehsils)
 
     # 5. Other Filters
     sel_reg = st.sidebar.multiselect("Region", df[reg_col].unique().tolist()) if reg_col else []
     sel_sex = st.sidebar.multiselect("Gender", df[sex_col].unique().tolist()) if sex_col else []
-    
-    # 6. Education - NEW
     sel_edu = st.sidebar.multiselect("Education", df[edu_col].unique().tolist()) if edu_col else []
 
     # --- FILTER MASK ---
@@ -118,14 +116,14 @@ if df is not None:
     if prov_col: mask = mask & df[prov_col].isin(sel_prov)
     if age_col: mask = mask & (df[age_col] >= sel_age[0]) & (df[age_col] <= sel_age[1])
     if sel_dist: mask = mask & df[dist_col].isin(sel_dist)
-    if sel_tehsil: mask = mask & df[tehsil_col].isin(sel_tehsil) # Applied Tehsil
+    if sel_tehsil: mask = mask & df[tehsil_col].isin(sel_tehsil)
     if sel_reg: mask = mask & df[reg_col].isin(sel_reg)
     if sel_sex: mask = mask & df[sex_col].isin(sel_sex)
-    if sel_edu: mask = mask & df[edu_col].isin(sel_edu) # Applied Education
+    if sel_edu: mask = mask & df[edu_col].isin(sel_edu)
         
     filtered_count = mask.sum()
 
-    # --- TOP ROW: KPI CARDS ---
+    # --- KPI CARDS ---
     c1, c2, c3 = st.columns(3)
     c1.metric("Total Database", f"{len(df):,.0f}")
     c2.metric("Filtered Respondents", f"{filtered_count:,.0f}")
@@ -137,13 +135,13 @@ if df is not None:
     ignore = [prov_col, reg_col, sex_col, dist_col, tehsil_col, edu_col, age_col, "Mouza", "Locality", "PCode", "EBCode"]
     questions = [c for c in df.columns if c not in ignore]
     
-    # Default to Marital Status
+    # Default: Marital Status
     default_target = "Marital status (S4C7)"
     default_index = questions.index(default_target) if default_target in questions else 0
     target_q = st.selectbox("Select Question to Analyze:", questions, index=default_index)
 
     if target_q:
-        # Prepare Main Data (Minimal Load)
+        # Prepare Main Data
         cols_to_load = [target_q] + [c for c in [prov_col, sex_col, reg_col, dist_col, age_col] if c]
         main_data = df.loc[mask, cols_to_load]
         
@@ -153,11 +151,11 @@ if df is not None:
         main_data = main_data[main_data[target_q] != "nan"]
         
         # ==========================================================
-        # ROW 1: THE BIG PICTURE
+        # ROW 1
         # ==========================================================
         col1, col2, col3 = st.columns([1.5, 1, 1])
 
-        # 1. OVERALL BAR CHART (%)
+        # 1. OVERALL BAR
         with col1:
             st.markdown("**📊 Overall Results (%)**")
             counts = main_data[target_q].value_counts().reset_index()
@@ -172,7 +170,7 @@ if df is not None:
             fig1.update_layout(showlegend=True, margin=dict(l=20, r=20, t=30, b=20))
             st.plotly_chart(fig1, use_container_width=True)
 
-        # 2. PROVINCE STACKED BAR (%)
+        # 2. PROVINCE BAR
         with col2:
             st.markdown("**🗺️ By Province (%)**")
             if prov_col:
@@ -199,7 +197,7 @@ if df is not None:
                 st.plotly_chart(fig3, use_container_width=True)
 
         # ==========================================================
-        # ROW 2: DEEP DIVE
+        # ROW 2
         # ==========================================================
         col4, col5, col6 = st.columns([1, 1.5, 1])
 
@@ -215,7 +213,7 @@ if df is not None:
                                    legend=dict(orientation="h"))
                 st.plotly_chart(fig4, use_container_width=True)
 
-        # 5. AGE TRENDS (%)
+        # 5. AGE TRENDS
         with col5:
             st.markdown("**📈 Age Trends (%)**")
             if age_col:
@@ -230,22 +228,42 @@ if df is not None:
                 fig5.update_layout(showlegend=True, margin=dict(l=20, r=20, t=30, b=20), yaxis_title="%")
                 st.plotly_chart(fig5, use_container_width=True)
 
-        # 6. DISTRICT TREEMAP
+        # 6. DISTRICT TREEMAP (SMART HEATMAP)
         with col6:
-            st.markdown("**🧱 District Treemap**")
             if dist_col:
-                dist_counts = main_data[dist_col].value_counts().head(10).reset_index()
-                dist_counts.columns = ["District", "Count"]
-                total_dist = dist_counts["Count"].sum()
-                dist_counts["Label"] = dist_counts.apply(lambda x: f"{x['District']}<br>{(x['Count']/total_dist*100):.1f}%", axis=1)
+                # 1. Detect "Top Answer"
+                top_ans = main_data[target_q].mode()[0]
+                st.markdown(f"**🧱 District Heatmap**<br><span style='font-size:0.8em; color:gray'>Color = <b>% {top_ans}</b></span>", unsafe_allow_html=True)
+                
+                # 2. Get Top 10 Districts
+                top_10 = main_data[dist_col].value_counts().head(10).index.tolist()
+                subset = main_data[main_data[dist_col].isin(top_10)]
+                
+                # 3. Calculate % of Top Answer
+                dist_stats = pd.crosstab(subset[dist_col], subset[target_q], normalize='index') * 100
+                
+                if top_ans in dist_stats.columns:
+                    plot_df = dist_stats[[top_ans]].reset_index()
+                    plot_df.columns = ["District", "Percent"]
+                    
+                    # 4. Add Sizes
+                    counts = subset[dist_col].value_counts().reset_index()
+                    counts.columns = ["District", "Count"]
+                    final_df = pd.merge(plot_df, counts, on="District")
+                    
+                    # 5. Label
+                    final_df["Label"] = final_df.apply(lambda x: f"{x['District']}<br>{x['Percent']:.1f}%", axis=1)
 
-                fig6 = px.treemap(dist_counts, path=["Label"], values="Count",
-                                  color="Count", color_continuous_scale="Viridis")
-                fig6.update_layout(margin=dict(l=10, r=10, t=10, b=10))
-                st.plotly_chart(fig6, use_container_width=True)
+                    fig6 = px.treemap(final_df, path=["Label"], values="Count",
+                                      color="Percent", color_continuous_scale="Viridis",
+                                      title=None)
+                    fig6.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+                    st.plotly_chart(fig6, use_container_width=True)
+                else:
+                    st.warning("Data insufficient for map")
 
         # ==========================================================
-        # ROW 3: DATA TABLES
+        # ROW 3: TABLES
         # ==========================================================
         st.markdown("---")
         t1, t2 = st.columns(2)
