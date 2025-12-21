@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import os
 import gc
+import json
 
 # --- 1. SETUP ---
 st.set_page_config(page_title="Gallup Pakistan Dashboard", layout="wide", page_icon="📊")
@@ -22,7 +23,7 @@ st.markdown("""
 
 st.title("📊 Gallup Pakistan: National LFS Survey")
 
-# --- 2. ZERO-COPY DATA LOADER ---
+# --- 2. OPTIMIZED DATA LOADER ---
 @st.cache_resource
 def load_data_optimized():
     try:
@@ -34,6 +35,7 @@ def load_data_optimized():
 
         # B. Chunk Load
         chunks = []
+        # Load as String (dtype=str) to prevent errors
         for chunk in pd.read_csv(file_name, compression='zip', chunksize=50000, low_memory=True, dtype=str):
             for col in chunk.columns:
                 chunk[col] = chunk[col].astype('category')
@@ -155,7 +157,7 @@ if df is not None:
         # ==========================================================
         col1, col2, col3 = st.columns([1.5, 1, 1])
 
-        # 1. OVERALL BAR (Variable 'counts' defined here)
+        # 1. OVERALL BAR
         with col1:
             st.markdown("**📊 Overall Results (%)**")
             counts = main_data[target_q].value_counts().reset_index()
@@ -217,9 +219,11 @@ if df is not None:
         with col5:
             st.markdown("**📈 Age Trends (%)**")
             if age_col:
-                main_data['AgeGrp'] = pd.cut(main_data[age_col], bins=[0,18,30,45,60,100], labels=['<18','18-30','31-45','46-60','60+'])
-                age_grp = main_data.groupby(['AgeGrp', target_q], observed=True).size().reset_index(name='Count')
+                # Use a Copy to avoid warnings
+                chart_data = main_data.copy()
+                chart_data['AgeGrp'] = pd.cut(chart_data[age_col], bins=[0,18,30,45,60,100], labels=['<18','18-30','31-45','46-60','60+'])
                 
+                age_grp = chart_data.groupby(['AgeGrp', target_q], observed=True).size().reset_index(name='Count')
                 age_totals = age_grp.groupby('AgeGrp', observed=True)['Count'].transform('sum')
                 age_grp['%'] = (age_grp['Count'] / age_totals * 100).fillna(0)
                 
@@ -228,42 +232,67 @@ if df is not None:
                 fig5.update_layout(showlegend=True, margin=dict(l=20, r=20, t=30, b=20), yaxis_title="%")
                 st.plotly_chart(fig5, use_container_width=True)
 
-       # 6. DISTRICT TREEMAP (SMART HEATMAP)
+        # 6. ACTUAL GEOGRAPHIC MAP (With Karachi Grouping)
         with col6:
-            if dist_col:
-                # 1. Detect "Top Answer" (e.g., "Yes")
+            st.markdown("**🗺️ Geographic Heatmap**")
+            
+            geojson_path = "pakistan_districts.geojson"
+            
+            if os.path.exists(geojson_path) and dist_col:
+                with open(geojson_path) as f:
+                    pak_geojson = json.load(f)
+                
+                # --- A. DETECT TOP ANSWER ---
                 top_ans = main_data[target_q].mode()[0]
-                
-                # Header with Clarification
-                st.markdown(f"**🧱 District Heatmap**", unsafe_allow_html=True)
-                st.caption(f"**Size** = Number of Respondents | **Color** = % saying '{top_ans}' (Yellow is High)")
+                st.caption(f"Color represents **% {top_ans}**")
 
-                # 2. Get Top 10 Districts
-                top_10 = main_data[dist_col].value_counts().head(10).index.tolist()
-                subset = main_data[main_data[dist_col].isin(top_10)]
+                # --- B. DATA GROUPING FOR KARACHI ---
+                # This explicitly merges all sub-districts into "KARACHI" to match the map file
+                merge_map = {
+                    "KARACHI CENTRAL": "KARACHI",
+                    "KARACHI EAST": "KARACHI",
+                    "KARACHI SOUTH": "KARACHI",
+                    "KARACHI WEST": "KARACHI",
+                    "MALIR": "KARACHI",
+                    "KORANGI": "KARACHI",
+                    "EAST": "KARACHI",
+                    "WEST": "KARACHI"
+                }
                 
-                # 3. Calculate % of Top Answer
-                dist_stats = pd.crosstab(subset[dist_col], subset[target_q], normalize='index') * 100
+                # Create temp column for mapping
+                map_df = main_data.copy()
+                map_df["Map_District"] = map_df[dist_col].replace(merge_map)
+                
+                # --- C. CALCULATE STATS ---
+                dist_stats = pd.crosstab(map_df["Map_District"], map_df[target_q], normalize='index') * 100
                 
                 if top_ans in dist_stats.columns:
-                    plot_df = dist_stats[[top_ans]].reset_index()
-                    plot_df.columns = ["District", "Percent"]
+                    map_data = dist_stats[[top_ans]].reset_index()
+                    map_data.columns = ["District", "Percent"]
                     
-                    # 4. Add Sizes (Count)
-                    tree_counts = subset[dist_col].value_counts().reset_index()
-                    tree_counts.columns = ["District", "Count"]
-                    final_df = pd.merge(plot_df, tree_counts, on="District")
-                    
-                    # 5. Label
-                    final_df["Label"] = final_df.apply(lambda x: f"{x['District']}<br>{x['Percent']:.1f}%", axis=1)
-
-                    fig6 = px.treemap(final_df, path=["Label"], values="Count",
-                                      color="Percent", color_continuous_scale="Viridis",
-                                      title=None)
-                    fig6.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+                    # --- D. DRAW MAP ---
+                    fig6 = px.choropleth_mapbox(
+                        map_data,
+                        geojson=pak_geojson,
+                        locations="District",
+                        featureidkey="properties.districts", # Key from your JSON file
+                        color="Percent",
+                        color_continuous_scale="Viridis",
+                        range_color=(0, 100),
+                        mapbox_style="carto-positron",
+                        zoom=4, center = {"lat": 30.3753, "lon": 69.3451},
+                        opacity=0.7,
+                        labels={'Percent': f'% {top_ans}'}
+                    )
+                    fig6.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
                     st.plotly_chart(fig6, use_container_width=True)
                 else:
-                    st.warning("Data insufficient for map")
+                    st.warning("Not enough data to map.")
+            
+            elif not os.path.exists(geojson_path):
+                st.warning("⚠️ Map file missing. Upload 'pakistan_districts.geojson'")
+            else:
+                st.warning("Please select a District column.")
 
         # ==========================================================
         # ROW 3: TABLES
@@ -273,21 +302,21 @@ if df is not None:
         
         with t1:
             st.subheader("📋 Overall Data")
-            st.caption("Detailed breakdown of answers for the selected filters.")
+            st.caption("Detailed breakdown of answers.")
             counts["%"] = counts["%"].map("{:.1f}%".format)
             st.dataframe(counts, use_container_width=True, hide_index=True)
             
         with t2:
+            top_ans = main_data[target_q].mode()[0]
             st.subheader(f"🏘️ District Rankings (Top % {top_ans})")
-            st.caption(f"Districts sorted by highest percentage of **'{top_ans}'**. Top 50 shown.")
+            st.caption(f"Districts sorted by highest percentage of **'{top_ans}'**.")
             
             if dist_col:
                 dist_pivot = pd.crosstab(main_data[dist_col], main_data[target_q], normalize='index') * 100
                 if not dist_pivot.empty:
-                    # Sort by the most common answer (e.g. Yes)
                     dist_pivot = dist_pivot.sort_values(by=top_ans, ascending=False).head(50)
                     dist_display = dist_pivot.applymap(lambda x: f"{x:.1f}%")
                     st.dataframe(dist_display, use_container_width=True)
+
 else:
     st.info("Awaiting Data...")
-
