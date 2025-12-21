@@ -155,7 +155,7 @@ if df is not None:
         # ==========================================================
         col1, col2, col3 = st.columns([1.5, 1, 1])
 
-        # 1. OVERALL BAR
+        # 1. OVERALL BAR (Variable 'counts' defined here)
         with col1:
             st.markdown("**📊 Overall Results (%)**")
             counts = main_data[target_q].value_counts().reset_index()
@@ -228,7 +228,7 @@ if df is not None:
                 fig5.update_layout(showlegend=True, margin=dict(l=20, r=20, t=30, b=20), yaxis_title="%")
                 st.plotly_chart(fig5, use_container_width=True)
 
-        # 6. DISTRICT TREEMAP (SMART HEATMAP)
+        # 6. DISTRICT TREEMAP (FIXED VARIABLE NAME)
         with col6:
             if dist_col:
                 # 1. Detect "Top Answer"
@@ -246,10 +246,12 @@ if df is not None:
                     plot_df = dist_stats[[top_ans]].reset_index()
                     plot_df.columns = ["District", "Percent"]
                     
-                    # 4. Add Sizes
-                    counts = subset[dist_col].value_counts().reset_index()
-                    counts.columns = ["District", "Count"]
-                    final_df = pd.merge(plot_df, counts, on="District")
+                    # 4. Add Sizes - RENAME VARIABLE HERE to 'tree_counts'
+                    tree_counts = subset[dist_col].value_counts().reset_index()
+                    tree_counts.columns = ["District", "Count"]
+                    
+                    # Merge using new variable
+                    final_df = pd.merge(plot_df, tree_counts, on="District")
                     
                     # 5. Label
                     final_df["Label"] = final_df.apply(lambda x: f"{x['District']}<br>{x['Percent']:.1f}%", axis=1)
@@ -263,13 +265,14 @@ if df is not None:
                     st.warning("Data insufficient for map")
 
         # ==========================================================
-        # ROW 3: TABLES
+        # ROW 3: TABLES (Now 'counts' is safe!)
         # ==========================================================
         st.markdown("---")
         t1, t2 = st.columns(2)
         
         with t1:
             st.subheader("📋 Overall Data")
+            # This safely uses the 'counts' from Row 1
             counts["%"] = counts["%"].map("{:.1f}%".format)
             st.dataframe(counts, use_container_width=True, hide_index=True)
             
