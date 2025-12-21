@@ -228,13 +228,16 @@ if df is not None:
                 fig5.update_layout(showlegend=True, margin=dict(l=20, r=20, t=30, b=20), yaxis_title="%")
                 st.plotly_chart(fig5, use_container_width=True)
 
-        # 6. DISTRICT TREEMAP (FIXED VARIABLE NAME)
+       # 6. DISTRICT TREEMAP (SMART HEATMAP)
         with col6:
             if dist_col:
-                # 1. Detect "Top Answer"
+                # 1. Detect "Top Answer" (e.g., "Yes")
                 top_ans = main_data[target_q].mode()[0]
-                st.markdown(f"**🧱 District Heatmap**<br><span style='font-size:0.8em; color:gray'>Color = <b>% {top_ans}</b></span>", unsafe_allow_html=True)
                 
+                # Header with Clarification
+                st.markdown(f"**🧱 District Heatmap**", unsafe_allow_html=True)
+                st.caption(f"**Size** = Number of Respondents | **Color** = % saying '{top_ans}' (Yellow is High)")
+
                 # 2. Get Top 10 Districts
                 top_10 = main_data[dist_col].value_counts().head(10).index.tolist()
                 subset = main_data[main_data[dist_col].isin(top_10)]
@@ -246,11 +249,9 @@ if df is not None:
                     plot_df = dist_stats[[top_ans]].reset_index()
                     plot_df.columns = ["District", "Percent"]
                     
-                    # 4. Add Sizes - RENAME VARIABLE HERE to 'tree_counts'
+                    # 4. Add Sizes (Count)
                     tree_counts = subset[dist_col].value_counts().reset_index()
                     tree_counts.columns = ["District", "Count"]
-                    
-                    # Merge using new variable
                     final_df = pd.merge(plot_df, tree_counts, on="District")
                     
                     # 5. Label
@@ -265,26 +266,28 @@ if df is not None:
                     st.warning("Data insufficient for map")
 
         # ==========================================================
-        # ROW 3: TABLES (Now 'counts' is safe!)
+        # ROW 3: TABLES
         # ==========================================================
         st.markdown("---")
         t1, t2 = st.columns(2)
         
         with t1:
             st.subheader("📋 Overall Data")
-            # This safely uses the 'counts' from Row 1
+            st.caption("Detailed breakdown of answers for the selected filters.")
             counts["%"] = counts["%"].map("{:.1f}%".format)
             st.dataframe(counts, use_container_width=True, hide_index=True)
             
         with t2:
-            st.subheader("🏘️ District Rankings (Top %)")
+            st.subheader(f"🏘️ District Rankings (Top % {top_ans})")
+            st.caption(f"Districts sorted by highest percentage of **'{top_ans}'**. Top 50 shown.")
+            
             if dist_col:
                 dist_pivot = pd.crosstab(main_data[dist_col], main_data[target_q], normalize='index') * 100
                 if not dist_pivot.empty:
-                    top_ans = dist_pivot.mean().idxmax()
+                    # Sort by the most common answer (e.g. Yes)
                     dist_pivot = dist_pivot.sort_values(by=top_ans, ascending=False).head(50)
                     dist_display = dist_pivot.applymap(lambda x: f"{x:.1f}%")
                     st.dataframe(dist_display, use_container_width=True)
-
 else:
     st.info("Awaiting Data...")
+
