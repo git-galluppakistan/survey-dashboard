@@ -119,11 +119,21 @@ if df is not None:
     c3.metric("Selection Share", f"{(filtered_count/len(df)*100):.1f}%")
     
     st.markdown("---")
-
-    # --- MAIN QUESTION SELECTION ---
+# --- MAIN QUESTION SELECTION ---
     ignore = [prov_col, reg_col, sex_col, dist_col, tehsil_col, edu_col, age_col, "Mouza", "Locality", "PCode", "EBCode"]
     questions = [c for c in df.columns if c not in ignore]
-    target_q = st.selectbox("Select Question to Analyze:", questions)
+    
+    # 1. Define the Default Question
+    default_target = "Marital status (S4C7)"
+    
+    # 2. Find its position in the list (Safety Check)
+    if default_target in questions:
+        default_index = questions.index(default_target)
+    else:
+        default_index = 0 # Fallback to first item if not found
+        
+    # 3. Create Selectbox with default index
+    target_q = st.selectbox("Select Question to Analyze:", questions, index=default_index)
 
     if target_q:
         # Prepare Main Data
@@ -259,3 +269,4 @@ if df is not None:
 
 else:
     st.info("Awaiting Data...")
+
