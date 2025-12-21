@@ -7,7 +7,7 @@ import gc
 # --- 1. SETUP ---
 st.set_page_config(page_title="Gallup Pakistan Dashboard", layout="wide", page_icon="📊")
 
-# Modern CSS: Reduce padding, add borders to cards
+# Modern CSS
 st.markdown("""
     <style>
     .block-container {padding-top: 1rem; padding-left: 1rem; padding-right: 1rem;}
@@ -32,9 +32,8 @@ def load_data_optimized():
             st.error(f"File not found: {file_name}")
             return None
 
-        # B. Chunk Load & Compress
+        # B. Chunk Load
         chunks = []
-        # Added dtype=str for safety, similar to the HF fix
         for chunk in pd.read_csv(file_name, compression='zip', chunksize=50000, low_memory=True, dtype=str):
             for col in chunk.columns:
                 chunk[col] = chunk[col].astype('category')
@@ -87,28 +86,42 @@ if df is not None:
     edu_col = get_col(["S4C9", "Education", "Highest class"])
     age_col = get_col(["S4C6", "Age"])
 
-    # Sidebar Layout
+    # 1. Province (Always Visible)
     prov_list = df[prov_col].unique().tolist() if prov_col else []
     sel_prov = st.sidebar.multiselect("Province", prov_list, default=prov_list)
     
+    # 2. Age Range
     if age_col:
         min_age, max_age = int(df[age_col].min()), int(df[age_col].max())
         sel_age = st.sidebar.slider("Age Range", min_age, max_age, (min_age, max_age))
     
-    # Conditional Filters
+    # 3. District (Dependent on Province)
     valid_districts = df[df[prov_col].isin(sel_prov)][dist_col].unique().tolist() if (sel_prov and dist_col) else []
     sel_dist = st.sidebar.multiselect("District", valid_districts)
 
+    # 4. Tehsil (Dependent on District) - NEW
+    if sel_dist and tehsil_col:
+        valid_tehsils = df[df[dist_col].isin(sel_dist)][tehsil_col].unique().tolist()
+    else:
+        valid_tehsils = [] # Hide if no district selected to save memory
+    sel_tehsil = st.sidebar.multiselect("Tehsil", valid_tehsils)
+
+    # 5. Other Filters
     sel_reg = st.sidebar.multiselect("Region", df[reg_col].unique().tolist()) if reg_col else []
     sel_sex = st.sidebar.multiselect("Gender", df[sex_col].unique().tolist()) if sex_col else []
+    
+    # 6. Education - NEW
+    sel_edu = st.sidebar.multiselect("Education", df[edu_col].unique().tolist()) if edu_col else []
 
     # --- FILTER MASK ---
     mask = pd.Series(True, index=df.index)
     if prov_col: mask = mask & df[prov_col].isin(sel_prov)
     if age_col: mask = mask & (df[age_col] >= sel_age[0]) & (df[age_col] <= sel_age[1])
     if sel_dist: mask = mask & df[dist_col].isin(sel_dist)
+    if sel_tehsil: mask = mask & df[tehsil_col].isin(sel_tehsil) # Applied Tehsil
     if sel_reg: mask = mask & df[reg_col].isin(sel_reg)
     if sel_sex: mask = mask & df[sex_col].isin(sel_sex)
+    if sel_edu: mask = mask & df[edu_col].isin(sel_edu) # Applied Education
         
     filtered_count = mask.sum()
 
@@ -119,24 +132,18 @@ if df is not None:
     c3.metric("Selection Share", f"{(filtered_count/len(df)*100):.1f}%")
     
     st.markdown("---")
-# --- MAIN QUESTION SELECTION ---
+
+    # --- MAIN QUESTION SELECTION ---
     ignore = [prov_col, reg_col, sex_col, dist_col, tehsil_col, edu_col, age_col, "Mouza", "Locality", "PCode", "EBCode"]
     questions = [c for c in df.columns if c not in ignore]
     
-    # 1. Define the Default Question
+    # Default to Marital Status
     default_target = "Marital status (S4C7)"
-    
-    # 2. Find its position in the list (Safety Check)
-    if default_target in questions:
-        default_index = questions.index(default_target)
-    else:
-        default_index = 0 # Fallback to first item if not found
-        
-    # 3. Create Selectbox with default index
+    default_index = questions.index(default_target) if default_target in questions else 0
     target_q = st.selectbox("Select Question to Analyze:", questions, index=default_index)
 
     if target_q:
-        # Prepare Main Data
+        # Prepare Main Data (Minimal Load)
         cols_to_load = [target_q] + [c for c in [prov_col, sex_col, reg_col, dist_col, age_col] if c]
         main_data = df.loc[mask, cols_to_load]
         
@@ -146,11 +153,11 @@ if df is not None:
         main_data = main_data[main_data[target_q] != "nan"]
         
         # ==========================================================
-        # ROW 1: THE BIG PICTURE (3 CHARTS)
+        # ROW 1: THE BIG PICTURE
         # ==========================================================
         col1, col2, col3 = st.columns([1.5, 1, 1])
 
-        # 1. OVERALL BAR CHART (Now shows %)
+        # 1. OVERALL BAR CHART (%)
         with col1:
             st.markdown("**📊 Overall Results (%)**")
             counts = main_data[target_q].value_counts().reset_index()
@@ -158,7 +165,6 @@ if df is not None:
             total = counts["Count"].sum()
             counts["%"] = (counts["Count"] / total * 100).fillna(0)
             
-            # Change: Y-axis is now %, Legend is TRUE
             fig1 = px.bar(counts, x="Answer", y="%", color="Answer", 
                           text=counts["%"].apply(lambda x: f"{x:.1f}%"),
                           template="plotly_white", 
@@ -166,18 +172,16 @@ if df is not None:
             fig1.update_layout(showlegend=True, margin=dict(l=20, r=20, t=30, b=20))
             st.plotly_chart(fig1, use_container_width=True)
 
-        # 2. PROVINCE STACKED BAR (Already %)
+        # 2. PROVINCE STACKED BAR (%)
         with col2:
             st.markdown("**🗺️ By Province (%)**")
             if prov_col:
                 prov_grp = main_data.groupby([prov_col, target_q], observed=True).size().reset_index(name='Count')
-                # Normalize to 100%
                 prov_totals = prov_grp.groupby(prov_col, observed=True)['Count'].transform('sum')
                 prov_grp['%'] = (prov_grp['Count'] / prov_totals * 100).fillna(0)
                 
                 fig2 = px.bar(prov_grp, x=prov_col, y="%", color=target_q,
                               template="plotly_white", barmode="stack")
-                # Change: Legend is TRUE
                 fig2.update_layout(showlegend=True, margin=dict(l=20, r=20, t=30, b=20), yaxis_title="%")
                 st.plotly_chart(fig2, use_container_width=True)
 
@@ -195,7 +199,7 @@ if df is not None:
                 st.plotly_chart(fig3, use_container_width=True)
 
         # ==========================================================
-        # ROW 2: DEEP DIVE (3 CHARTS)
+        # ROW 2: DEEP DIVE
         # ==========================================================
         col4, col5, col6 = st.columns([1, 1.5, 1])
 
@@ -211,22 +215,18 @@ if df is not None:
                                    legend=dict(orientation="h"))
                 st.plotly_chart(fig4, use_container_width=True)
 
-        # 5. AGE TRENDS (Area Chart converted to %)
+        # 5. AGE TRENDS (%)
         with col5:
             st.markdown("**📈 Age Trends (%)**")
             if age_col:
-                # Bin Ages
                 main_data['AgeGrp'] = pd.cut(main_data[age_col], bins=[0,18,30,45,60,100], labels=['<18','18-30','31-45','46-60','60+'])
                 age_grp = main_data.groupby(['AgeGrp', target_q], observed=True).size().reset_index(name='Count')
                 
-                # NORMALIZE: Calculate % within each Age Group
                 age_totals = age_grp.groupby('AgeGrp', observed=True)['Count'].transform('sum')
                 age_grp['%'] = (age_grp['Count'] / age_totals * 100).fillna(0)
                 
-                # Change: Plot % instead of Count
                 fig5 = px.area(age_grp, x="AgeGrp", y="%", color=target_q,
                                template="plotly_white", markers=True)
-                # Change: Legend TRUE
                 fig5.update_layout(showlegend=True, margin=dict(l=20, r=20, t=30, b=20), yaxis_title="%")
                 st.plotly_chart(fig5, use_container_width=True)
 
@@ -236,8 +236,6 @@ if df is not None:
             if dist_col:
                 dist_counts = main_data[dist_col].value_counts().head(10).reset_index()
                 dist_counts.columns = ["District", "Count"]
-                
-                # Calculate % for Label
                 total_dist = dist_counts["Count"].sum()
                 dist_counts["Label"] = dist_counts.apply(lambda x: f"{x['District']}<br>{(x['Count']/total_dist*100):.1f}%", axis=1)
 
@@ -269,4 +267,3 @@ if df is not None:
 
 else:
     st.info("Awaiting Data...")
-
