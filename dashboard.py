@@ -144,14 +144,14 @@ if df is not None:
         main_data = main_data[main_data[target_q] != "#NULL!"]
         main_data = main_data[main_data[target_q] != "nan"]
         
-        # Detect Top Answer for Coloring
+        # Detect Top Answer
         top_ans = main_data[target_q].mode()[0]
 
         # ==========================================================
-        # ROW 1: THE HERO MAP (Geographic)
+        # ROW 1: THE HERO MAP (Enhanced Colors)
         # ==========================================================
         st.subheader("🗺️ Geographic Distribution")
-        st.caption(f"Color intensity represents the percentage of respondents answering **'{top_ans}'**.")
+        st.caption(f"**Red** = High Percentage | **Blue** = Low Percentage (Showing data for: '{top_ans}')")
         
         geojson_path = "pakistan_districts.geojson"
         
@@ -159,7 +159,7 @@ if df is not None:
             with open(geojson_path) as f:
                 pak_geojson = json.load(f)
             
-            # Group Karachi Districts for Map Matching
+            # Karachi Grouping
             merge_map = {
                 "KARACHI CENTRAL": "KARACHI", "KARACHI EAST": "KARACHI",
                 "KARACHI SOUTH": "KARACHI", "KARACHI WEST": "KARACHI",
@@ -175,11 +175,19 @@ if df is not None:
                 map_data = dist_stats[[top_ans]].reset_index()
                 map_data.columns = ["District", "Percent"]
                 
+                # --- COLOR ENHANCEMENT HERE ---
                 fig_map = px.choropleth_mapbox(
                     map_data, geojson=pak_geojson, locations="District",
                     featureidkey="properties.districts",
-                    color="Percent", color_continuous_scale="Viridis",
-                    range_color=(0, 100), mapbox_style="carto-positron",
+                    color="Percent", 
+                    
+                    # 1. New High-Contrast Color Scale (Red=High, Blue=Low)
+                    color_continuous_scale="Spectral_r", 
+                    
+                    # 2. Auto-Scale (Removed fixed 0-100 range)
+                    # range_color=(0, 100), 
+                    
+                    mapbox_style="carto-positron",
                     zoom=4.5, center = {"lat": 30.3753, "lon": 69.3451},
                     opacity=0.7, labels={'Percent': f'% {top_ans}'}
                 )
@@ -269,7 +277,7 @@ if df is not None:
         st.caption(f"**Size** = Respondent Volume | **Color** = % answering '{top_ans}' (Yellow = High)")
         
         if dist_col:
-            # Note: Treemap uses ungrouped districts (Karachi Central etc show individually)
+            # Treemap uses raw ungrouped districts
             top_10 = main_data[dist_col].value_counts().head(15).index.tolist()
             subset = main_data[main_data[dist_col].isin(top_10)]
             
